@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> RPG do veinho </title>
+    <title>RPG Medieval Web 3D</title>
     <link rel="stylesheet" href="style.css">
     
     <script type="importmap">
@@ -18,8 +18,10 @@
 <body>
     <div id="game-container"></div>
     
+    <!-- NOVO: Tela preta para a transição de mapas -->
+    <div id="fade-screen"></div>
+    
     <div id="ui-layer">
-        <!-- Status fixo no canto da tela -->
         <div id="player-stats">
             <p>HP: <span id="stat-hp">100</span>/100</p>
             <p>XP: <span id="stat-xp">0</span></p>
@@ -27,7 +29,6 @@
             <hr style="border-color: #666; margin: 5px 0;">
             <p style="font-size: 14px; color: #ff6666;">ATK: <span id="stat-atk">5</span></p>
             <p style="font-size: 14px; color: #66b3ff;">DEF: <span id="stat-def">0</span></p>
-            <!-- MODIFICADO: Adicionado a tecla [K] -->
             <p style="font-size: 12px; color: #aaa; margin-top: 5px;">[I] Inventário | [K] Salvar</p>
         </div>
         
