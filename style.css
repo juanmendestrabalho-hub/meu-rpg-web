@@ -117,3 +117,20 @@ body {
     50% { opacity: 1; }
     100% { opacity: 0.6; }
 }
+
+/* NOVO: Sistema de Transição de Tela */
+#fade-screen {
+    position: absolute;
+    top: 0; left: 0; 
+    width: 100vw; height: 100vh;
+    background-color: black;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.8s ease-in-out;
+}
+
+#fade-screen.fade-active {
+    opacity: 1;
+    pointer-events: auto; /* Bloqueia cliques enquanto a tela está preta */
+}
