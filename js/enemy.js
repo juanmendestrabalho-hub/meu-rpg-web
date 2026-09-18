@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { generateItem } from './items.js';
 
+
 export class Enemy {
     constructor(game, name, x, z, hp, atk, def, modelPath) {
         this.game = game; 
