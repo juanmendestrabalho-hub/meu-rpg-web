@@ -4,7 +4,7 @@ export class QuestManager {
     constructor(gameEngine) {
         this.game = gameEngine;
         this.quests = {
-            mageQuest: { status: 'unstarted' }, // Fases: unstarted -> active -> artifact_found -> boss_active -> boss_defeated -> completed
+            mageQuest: { status: 'unstarted' },
             clericQuest: {
                 status: 'unstarted', 
                 targetEnemy: 'Ladino Sombrio',
