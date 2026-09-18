@@ -41,19 +41,14 @@ export class GameEngine {
         this.gltfLoader = new GLTFLoader();
 
         this.setupLights();
-        
-        // 1. Cria o jogador primeiro
         this.player = new Player(this);
         
-        // 2. Carrega o mapa/save DEPOIS do jogador existir
         if (!this.saveManager.loadGame()) {
             this.loadLevel('village');
         }
         
         this.ui.updateHUD(this.player);
         this.bindEvents();
-        
-        // 3. Inicia o loop renderizador por último
         this.start();
     }
 
@@ -80,27 +75,48 @@ export class GameEngine {
         this.levelObjects.push(ground); 
     }
 
+    // OTIMIZAÇÃO: Usando InstancedMesh para renderizar o mapa todo de uma vez só
     buildMap(levelMatrix, wallColorHex) {
         const tileSize = 3; 
         const wallGeo = new THREE.BoxGeometry(tileSize, 4, tileSize); 
         const wallMat = new THREE.MeshStandardMaterial({ color: wallColorHex }); 
         
+        let wallCount = 0;
+        for (let z = 0; z < levelMatrix.length; z++) {
+            for (let x = 0; x < levelMatrix[z].length; x++) {
+                if (levelMatrix[z][x] === 1) wallCount++;
+            }
+        }
+
+        const instancedMesh = new THREE.InstancedMesh(wallGeo, wallMat, wallCount);
+        instancedMesh.castShadow = true;
+        instancedMesh.receiveShadow = true;
+
         const offsetX = -(levelMatrix[0].length * tileSize) / 2;
         const offsetZ = -(levelMatrix.length * tileSize) / 2;
-
+        const dummy = new THREE.Object3D();
+        
+        let i = 0;
         for (let z = 0; z < levelMatrix.length; z++) {
             for (let x = 0; x < levelMatrix[z].length; x++) {
                 if (levelMatrix[z][x] === 1) {
-                    const wall = new THREE.Mesh(wallGeo, wallMat);
-                    wall.position.set(offsetX + (x * tileSize), 2, offsetZ + (z * tileSize));
-                    wall.castShadow = true; 
-                    wall.receiveShadow = true;   
-                    this.collidables.push(wall); 
-                    this.scene.add(wall);
-                    this.levelObjects.push(wall);
+                    dummy.position.set(offsetX + (x * tileSize), 2, offsetZ + (z * tileSize));
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                    
+                    // Colisão Invisível e ultraleve para o player não atravessar
+                    const colMesh = new THREE.Mesh(wallGeo, new THREE.MeshBasicMaterial({visible: false}));
+                    colMesh.position.copy(dummy.position);
+                    this.collidables.push(colMesh);
+                    this.scene.add(colMesh);
+                    this.levelObjects.push(colMesh);
+
+                    i++;
                 }
             }
         }
+        this.scene.add(instancedMesh);
+        this.levelObjects.push(instancedMesh);
     }
 
     spawnPortal(x, z, targetLevel, colorHex) {
@@ -149,7 +165,6 @@ export class GameEngine {
             this.createNPC("Clérigo Mercador", 8, 5, 0xffaa00, 'assets/Clérigo.gltf', () => this.questManager.interactWithCleric(), 120, 15, 10);
             
             this.spawnPortal(0, -15, 'dungeon', 0xaa00ff);
-            
             if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, 10);
 
         } 
@@ -165,21 +180,25 @@ export class GameEngine {
             });
             mapMatrix[4][4] = 1; mapMatrix[4][10] = 1;
             mapMatrix[10][4] = 1; mapMatrix[10][10] = 1;
-            
             this.buildMap(mapMatrix, 0x111111);
 
+            // Inimigos Normais
             this.spawnEnemy("Ladino Sombrio", 8, -8, 60, 10, 2, 'assets/Ladino.gltf');
             this.spawnEnemy("Ladino Sombrio", -8, -8, 60, 10, 2, 'assets/Ladino.gltf');
             this.spawnEnemy("Arqueiro Sombrio", 0, -12, 40, 15, 1, 'assets/Arqueiro.gltf');
             
-            this.spawnPortal(0, 15, 'village', 0x00aaff);
+            // O Spawn do Chefe Rei Orc no fundo da masmorra
+            this.spawnEnemy("Rei Orc", 0, -6, 200, 25, 5, 'assets/Orc.gltf');
             
+            this.spawnPortal(0, 15, 'village', 0x00aaff);
             if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, -10);
         }
     }
 
     spawnEnemy(name, x, z, hp, atk, def, modelPath) {
-        const enemy = new Enemy(this, name, x, z, hp, atk, def, modelPath);
+        // Tenta usar o orc se for o chefe, se o arquivo não existir ou falhar, usa o fallback nativo.
+        const path = name === "Rei Orc" ? 'assets/Orc.gltf' : modelPath;
+        const enemy = new Enemy(this, name, x, z, hp, atk, def, path);
         this.enemies.push(enemy);
         this.levelObjects.push(enemy.mesh); 
     }
@@ -256,7 +275,6 @@ export class GameEngine {
     }
 
     start() {
-        // Usa o requestAnimationFrame ao invés de setAnimationLoop para maior controle
         const animate = () => {
             requestAnimationFrame(animate);
             this.update();
@@ -265,14 +283,15 @@ export class GameEngine {
     }
 
     update() {
-        if (!this.clock) return; // Segurança
+        if (!this.clock) return; 
         const delta = this.clock.getDelta();
         
         if (this.player) this.player.update(delta);
         
+        // O Filtro de Inimigos agora respeita o tempo da animação de morte!
         if (this.enemies) {
             this.enemies.forEach(enemy => { if(enemy && enemy.update) enemy.update(delta); });
-            this.enemies = this.enemies.filter(enemy => enemy && !enemy.isDead);
+            this.enemies = this.enemies.filter(enemy => enemy && !enemy.isDisposed);
         }
         
         if (this.visualItems) {
