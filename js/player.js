@@ -1,32 +1,26 @@
 import * as THREE from 'three';
 
 export class Player {
-    constructor(scene, camera, collidables, ui) {
+    constructor(scene, camera, collidables, interactables, ui) {
         this.scene = scene;
         this.camera = camera;
         this.collidables = collidables; 
+        this.interactables = interactables; // Recebe o array de objetos interativos do mundo
         this.ui = ui; 
 
         this.hp = 100;
         this.xp = 0;
         this.coins = 50;
-
         this.speed = 8; 
         
         this.playerBox = new THREE.Box3();
+        this.nearestInteractable = null; // Guarda referência do NPC/Item mais próximo
         
-        this.keys = {
-            forward: false,
-            backward: false,
-            left: false,
-            right: false
-        };
-
+        this.keys = { forward: false, backward: false, left: false, right: false };
         this.cameraOffset = new THREE.Vector3(0, 15, 10);
 
         this.setupMesh();
         this.setupControls();
-        
         this.ui.updateHUD(this);
     }
 
@@ -42,7 +36,6 @@ export class Player {
         const faceGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
         const faceMat = new THREE.MeshStandardMaterial({ color: 0xffccaa }); 
         const face = new THREE.Mesh(faceGeo, faceMat);
-        
         face.position.set(0, 0.5, 0.4); 
         this.mesh.add(face); 
 
@@ -59,12 +52,16 @@ export class Player {
         if (code === 'KeyS' || code === 'ArrowDown') this.keys.backward = isPressed;
         if (code === 'KeyA' || code === 'ArrowLeft') this.keys.left = isPressed;
         if (code === 'KeyD' || code === 'ArrowRight') this.keys.right = isPressed;
+
+        // Lógica de Interação: Tecla E pressionada + Existe algo perto + Nenhuma janela aberta
+        if (code === 'KeyE' && isPressed && this.nearestInteractable && !this.ui.isPanelOpen()) {
+            this.nearestInteractable.onInteract();
+        }
     }
 
     update(delta) {
-        if (this.ui.isPanelOpen()) {
-            return; 
-        }
+        // Trava o movimento se estiver lendo um diálogo
+        if (this.ui.isPanelOpen()) return; 
 
         const direction = new THREE.Vector3(0, 0, 0);
 
@@ -75,7 +72,7 @@ export class Player {
 
         if (direction.lengthSq() > 0) {
             direction.normalize();
-
+            
             const moveX = direction.x * this.speed * delta;
             const moveZ = direction.z * this.speed * delta;
 
@@ -97,17 +94,37 @@ export class Player {
 
         this.camera.position.copy(this.mesh.position).add(this.cameraOffset);
         this.camera.lookAt(this.mesh.position);
+
+        // Checa distância para NPCs/Itens a cada frame
+        this.checkInteractables();
     }
 
     checkCollisions() {
         for (let i = 0; i < this.collidables.length; i++) {
-            const object = this.collidables[i];
-            const objectBox = new THREE.Box3().setFromObject(object);
-            
-            if (this.playerBox.intersectsBox(objectBox)) {
-                return true; 
-            }
+            const objectBox = new THREE.Box3().setFromObject(this.collidables[i]);
+            if (this.playerBox.intersectsBox(objectBox)) return true; 
         }
         return false;
+    }
+
+    checkInteractables() {
+        let closestDist = Infinity;
+        let closestObj = null;
+
+        for (let i = 0; i < this.interactables.length; i++) {
+            const interactable = this.interactables[i];
+            const dist = this.mesh.position.distanceTo(interactable.mesh.position);
+            
+            // Distância de 3.5 unidades no mundo 3D
+            if (dist < 3.5 && dist < closestDist) {
+                closestDist = dist;
+                closestObj = interactable;
+            }
+        }
+
+        if (this.nearestInteractable !== closestObj) {
+            this.nearestInteractable = closestObj;
+            this.ui.showInteractionPrompt(this.nearestInteractable !== null);
+        }
     }
 }
