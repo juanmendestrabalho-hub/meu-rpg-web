@@ -11,6 +11,7 @@ export class StealthManager {
             return;
         }
 
+        
         if (target.hasBeenRobbed) {
             this.game.ui.openPanel("Aviso", "<p>Você já limpou os bolsos desta pessoa. Estão vazios!</p>");
             return;
