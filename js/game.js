@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import { Player } from './player.js'; // NOVO: Importação do módulo do jogador
+import { Player } from './player.js';
+import { UIManager } from './ui.js'; 
 
 export class GameEngine {
     constructor() {
         this.container = document.getElementById('game-container');
+        
+        this.ui = new UIManager();
         
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87CEEB); 
@@ -19,15 +22,12 @@ export class GameEngine {
         
         this.clock = new THREE.Clock();
         
-        // NOVO: Array centralizado para entidades sólidas (paredes, npcs, árvores)
         this.collidables = [];
 
         this.setupEnvironment();
         this.setupLights();
         
-        // NOVO: Instanciamos o jogador, injetando a cena (para ele ser desenhado), 
-        // a câmera (para ele controlá-la) e os collidables (para calcular colisões)
-        this.player = new Player(this.scene, this.camera, this.collidables);
+        this.player = new Player(this.scene, this.camera, this.collidables, this.ui);
 
         this.bindEvents();
     }
@@ -45,7 +45,6 @@ export class GameEngine {
         
         this.scene.add(this.ground);
 
-        // NOVO: Adicionado 3 pilares para testar o sistema de colisão de forma prática
         const wallGeometry = new THREE.BoxGeometry(2, 2, 2);
         const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x8b8c89 });
         
@@ -61,7 +60,7 @@ export class GameEngine {
             wall.castShadow = true;      
             wall.receiveShadow = true;   
             
-            this.collidables.push(wall); // Adiciona no sistema de colisão
+            this.collidables.push(wall); 
             this.scene.add(wall);
         });
     }
@@ -104,7 +103,6 @@ export class GameEngine {
     update() {
         const delta = this.clock.getDelta();
 
-        // NOVO: Chama a lógica de movimentação, rotação e câmera a cada frame
         if (this.player) {
             this.player.update(delta);
         }
