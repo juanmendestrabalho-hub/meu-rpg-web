@@ -3,15 +3,12 @@ export class UIManager {
         this.hpStat = document.getElementById('stat-hp');
         this.xpStat = document.getElementById('stat-xp');
         this.coinStat = document.getElementById('stat-coins');
-        
         this.atkStat = document.getElementById('stat-atk');
         this.defStat = document.getElementById('stat-def');
-        
         this.actionPanel = document.getElementById('action-panel');
         this.panelTitle = document.getElementById('panel-title');
         this.panelContent = document.getElementById('panel-content');
         this.btnClose = document.getElementById('btn-close-panel');
-        
         this.interactionPrompt = document.getElementById('interaction-prompt');
 
         this.bindEvents();
@@ -19,7 +16,6 @@ export class UIManager {
 
     bindEvents() {
         this.btnClose.addEventListener('click', () => this.closePanel());
-        
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Escape' && this.isPanelOpen()) {
                 this.closePanel();
@@ -35,9 +31,14 @@ export class UIManager {
         this.defStat.innerText = player.getTotalDefense();
     }
 
-    showInteractionPrompt(show) {
-        if (show) {
+    showInteractionPrompt(interactable) {
+        if (interactable) {
             this.interactionPrompt.classList.remove('hidden');
+            if (interactable.isNPC) {
+                this.interactionPrompt.innerText = "Pressione [E] Falar | [R] Roubar";
+            } else {
+                this.interactionPrompt.innerText = "Pressione [E] para interagir";
+            }
         } else {
             this.interactionPrompt.classList.add('hidden');
         }
@@ -59,7 +60,6 @@ export class UIManager {
 
     openInventory(player) {
         let content = `<div style="display: flex; gap: 20px;">`;
-        
         content += `<div style="flex: 1; border-right: 1px solid #8b7355; padding-right: 15px;">
             <h3 style="color: #e2c08d; margin-bottom: 10px;">Equipado</h3>`;
             
