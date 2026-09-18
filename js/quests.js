@@ -235,6 +235,7 @@ export class QuestManager {
     // ----------------------------------------------------
     // ESCUTADORES GLOBAIS
     // ----------------------------------------------------
+    
     onEnemyKilled(enemyName) {
         const cq = this.quests.clericQuest;
         if (cq.status === 'active' && enemyName === cq.targetEnemy) {
