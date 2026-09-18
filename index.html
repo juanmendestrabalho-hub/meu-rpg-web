@@ -1,1 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Medieval Web 3D</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Mapeamento de módulos ES6 nativo. 
+         Isso permite importar o Three.js diretamente nos arquivos .js sem precisar de Node.js ou bundlers. -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Container onde o Three.js renderizará o mundo 3D -->
+    <div id="game-container"></div>
+    
+    <!-- Camada de UI: Fica por cima do canvas 3D (Z-index maior) -->
+    <div id="ui-layer">
+        <!-- Status fixo no canto da tela -->
+        <div id="player-stats">
+            <p>HP: <span id="stat-hp">100</span>/100</p>
+            <p>XP: <span id="stat-xp">0</span></p>
+            <p>Moedas: <span id="stat-coins">50</span></p>
+        </div>
+        
+        <!-- Painel dinâmico (Inventário, Missões, Loja). Oculto por padrão. -->
+        <div id="action-panel" class="hidden">
+            <h2 id="panel-title">Título</h2>
+            <div id="panel-content"></div>
+            <button id="btn-close-panel">Fechar [ESC]</button>
+        </div>
+        
+        <!-- Aviso de interação próximo a NPCs/Itens -->
+        <div id="interaction-prompt" class="hidden">
+            Pressione [E] para interagir
+        </div>
+    </div>
 
+    <!-- Ponto de entrada da aplicação. 'type="module"' é obrigatório para usar imports -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
