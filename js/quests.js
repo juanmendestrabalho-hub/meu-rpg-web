@@ -1,49 +1,56 @@
 export class QuestManager {
-    // Passamos a engine principal para que as missões possam afetar o jogador (dar XP, moedas)
     constructor(gameEngine) {
         this.game = gameEngine;
-        
-        // Dicionário de estado para rastrear o progresso do jogador nas missões
         this.state = {
-            mageQuestStatus: 'unstarted' // Pode ser: 'unstarted', 'active', 'completed'
+            mageQuestStatus: 'unstarted' // 'unstarted', 'active', 'artifact_found', 'completed'
         };
     }
 
-    // Função disparada quando interagimos com o NPC "Mago"
     interactWithMage() {
         let title = "Mago Ancião";
         let content = "";
 
-        // Árvore de Diálogo baseada no estado da missão
         if (this.state.mageQuestStatus === 'unstarted') {
             content = `
-                <p>Saudações, viajante. Goblins roubaram meu artefato mágico.</p>
-                <p>Você parece capaz. Aceita recuperá-lo para mim em troca de moedas?</p>
+                <p>Saudações, viajante. Goblins roubaram meu <b>Artefato Mágico</b> (Cubo Amarelo).</p>
+                <p>Aceita recuperá-lo para mim em troca de moedas e experiência?</p>
                 <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-                    <button id="btn-accept-quest" style="padding: 10px; cursor: pointer; background: #2b5c2b; color: white; border: 1px solid #4CAF50;">Aceitar Missão</button>
-                    <button id="btn-decline-quest" style="padding: 10px; cursor: pointer; background: #5c2b2b; color: white; border: 1px solid #f44336;">Recusar</button>
+                    <button id="btn-accept-quest" style="padding: 10px; cursor: pointer; background: #2b5c2b; color: white;">Aceitar Missão</button>
+                    <button id="btn-close-dialog" style="padding: 10px; cursor: pointer;">Recusar</button>
                 </div>
             `;
         } 
         else if (this.state.mageQuestStatus === 'active') {
             content = `
-                <p>Você ainda não encontrou o artefato? Procure pelos arredores, eu confio em você!</p>
+                <p>Você ainda não encontrou o artefato? Procure por um cubo amarelo brilhante girando pelo mundo!</p>
                 <div style="margin-top: 20px; text-align: center;">
                     <button id="btn-close-dialog" style="padding: 10px; cursor: pointer;">Entendido</button>
                 </div>
             `;
         }
+        else if (this.state.mageQuestStatus === 'artifact_found') {
+            content = `
+                <p>Pelos deuses, você encontrou! Muito obrigado, guerreiro.</p>
+                <p style="color: #4CAF50; margin-top: 10px;"><b>Recompensa: +100 Moedas, +50 XP</b></p>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="btn-complete-quest" style="padding: 10px; cursor: pointer; background: #2b5c2b; color: white;">Concluir e Receber</button>
+                </div>
+            `;
+        }
+        else if (this.state.mageQuestStatus === 'completed') {
+            content = `
+                <p>A magia flui mais forte agora graças a você. Boa sorte em sua jornada.</p>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="btn-close-dialog" style="padding: 10px; cursor: pointer;">Adeus</button>
+                </div>
+            `;
+        }
 
-        // Abre a janela de UI com o conteúdo gerado
         this.game.ui.openPanel(title, content);
 
-        // POR QUÊ DO SETTIMEOUT?
-        // Como o HTML acabou de ser injetado como string no DOM pela UI, 
-        // os botões ainda não existem na memória imediata do JS. 
-        // O setTimeout com 0ms joga a busca para o próximo ciclo (Event Loop), garantindo que os botões já renderizaram.
         setTimeout(() => {
             const btnAccept = document.getElementById('btn-accept-quest');
-            const btnDecline = document.getElementById('btn-decline-quest');
+            const btnComplete = document.getElementById('btn-complete-quest');
             const btnClose = document.getElementById('btn-close-dialog');
 
             if (btnAccept) {
@@ -53,12 +60,32 @@ export class QuestManager {
                 });
             }
 
-            if (btnDecline || btnClose) {
-                const btnToBind = btnDecline || btnClose;
-                btnToBind.addEventListener('click', () => {
-                    this.game.ui.closePanel();
+            if (btnComplete) {
+                btnComplete.addEventListener('click', () => {
+                    this.state.mageQuestStatus = 'completed';
+                    // Dá as recompensas ao jogador e atualiza o HUD
+                    this.game.player.coins += 100;
+                    this.game.player.xp += 50;
+                    this.game.ui.updateHUD(this.game.player);
+                    this.game.ui.openPanel("Mago Ancião", "<p>Recompensas recebidas com sucesso!</p>");
                 });
             }
+
+            if (btnClose) {
+                btnClose.addEventListener('click', () => this.game.ui.closePanel());
+            }
         }, 0);
+    }
+
+    // Chamado pelo game.js quando o jogador tenta pegar o artefato no chão
+    collectArtifact() {
+        if (this.state.mageQuestStatus === 'active') {
+            this.state.mageQuestStatus = 'artifact_found';
+            this.game.ui.openPanel("Item Coletado", "<p>Você recuperou o Artefato Mágico! Retorne ao Mago.</p>");
+            return true; // Retorna true para avisar o game.js que o item pode sumir do chão
+        } else {
+            this.game.ui.openPanel("Aviso", "<p>Este item exala poder, mas você não tem motivos para pegá-lo agora.</p>");
+            return false; // Retorna false para o item continuar no chão
+        }
     }
 }
