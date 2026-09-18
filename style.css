@@ -1,16 +1,15 @@
-/* Reset básico para evitar scroll e margens indesejadas na janela */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    user-select: none; /* Impede seleção acidental de texto durante o jogo */
+    user-select: none; 
 }
 
 body {
     overflow: hidden; 
     background-color: #000;
     color: #fff;
-    font-family: 'Courier New', Courier, monospace; /* Estética clássica RPG */
+    font-family: 'Courier New', Courier, monospace; 
 }
 
 #game-container {
@@ -22,8 +21,6 @@ body {
     z-index: 1;
 }
 
-/* Container de UI precisa bloquear interações de ponteiro apenas nos elementos visíveis,
-   deixando o clique passar para a câmera/mundo onde for transparente. */
 #ui-layer {
     position: absolute;
     top: 0;
@@ -42,7 +39,7 @@ body {
     padding: 15px;
     border: 2px solid #666;
     border-radius: 4px;
-    pointer-events: auto; /* Reativa cliques sobre o HUD */
+    pointer-events: auto; 
     text-shadow: 1px 1px 2px #000;
 }
 
@@ -59,10 +56,11 @@ body {
     transform: translate(-50%, -50%);
     background: rgba(20, 20, 25, 0.95);
     padding: 25px;
-    border: 4px solid #8b7355; /* Estilo de moldura medieval */
+    border: 4px solid #8b7355; 
     border-radius: 8px;
     min-width: 450px;
     min-height: 300px;
+    max-width: 80%;
     pointer-events: auto;
     display: flex;
     flex-direction: column;
