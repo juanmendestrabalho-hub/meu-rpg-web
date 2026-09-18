@@ -13,7 +13,8 @@ export class Enemy {
         this.speed = 3;
         this.attackTimer = 0;
         this.isDead = false;
-        this.isLoaded = false; // Flag de segurança
+        this.isDisposed = false; // Flag para o Garbage Collector do game.js
+        this.isLoaded = false; 
 
         this.mesh = new THREE.Group();
         this.mesh.position.set(x, 0, z);
@@ -25,6 +26,21 @@ export class Enemy {
         this.game.scene.add(this.mesh);
         this.enemyBox = new THREE.Box3();
 
+        // Sistema de Barra de Vida Flutuante (Sprite Canvas)
+        this.hpCanvas = document.createElement('canvas');
+        this.hpCanvas.width = 128;
+        this.hpCanvas.height = 32;
+        this.hpCtx = this.hpCanvas.getContext('2d');
+        
+        this.hpTexture = new THREE.CanvasTexture(this.hpCanvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: this.hpTexture, depthTest: false });
+        this.hpSprite = new THREE.Sprite(spriteMat);
+        this.hpSprite.position.set(0, 2.5, 0); // Fica 2.5 unidades acima do inimigo
+        this.hpSprite.scale.set(1.5, 0.375, 1);
+        this.mesh.add(this.hpSprite);
+        this.updateHpBar(); // Desenha a barra cheia
+
+        // Carregamento do Modelo 3D
         const loader = new GLTFLoader();
         loader.load(modelPath, (gltf) => {
             const model = gltf.scene;
@@ -55,6 +71,30 @@ export class Enemy {
         });
     }
 
+    // Função que pinta a barra de vida no Canvas 2D e envia pro 3D
+    updateHpBar() {
+        const ctx = this.hpCtx;
+        ctx.clearRect(0, 0, 128, 32);
+        
+        // Fundo preto transparente
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, 128, 32);
+        
+        // Barra de Vida
+        const percent = Math.max(0, this.hp / this.maxHp);
+        ctx.fillStyle = percent > 0.5 ? '#4CAF50' : (percent > 0.25 ? '#FFEB3B' : '#F44336');
+        ctx.fillRect(4, 4, 120 * percent, 24);
+        
+        // Texto de HP
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${Math.floor(this.hp)}/${this.maxHp}`, 64, 18);
+        
+        this.hpTexture.needsUpdate = true;
+    }
+
     playAnimation(name) {
         if (!this.mixer || !this.animations[name] || this.currentAction === this.animations[name]) return;
         
@@ -73,8 +113,11 @@ export class Enemy {
     }
 
     update(delta) {
-        if (!this.isLoaded || this.isDead || !this.game.player || !this.game.player.isLoaded) return;
+        if (!this.isLoaded) return;
         if (this.mixer) this.mixer.update(delta);
+        
+        // Se estiver morto, ele não persegue mais (mas o mixer acima continua atualizando a animação de morte)
+        if (this.isDead || !this.game.player || !this.game.player.isLoaded) return;
 
         if (this.attackTimer > 0) this.attackTimer -= delta;
 
@@ -110,21 +153,15 @@ export class Enemy {
         
         const actualDamage = Math.max(1, amount - this.def);
         this.hp -= actualDamage;
+        this.updateHpBar(); // Atualiza o Sprite visual do HP
 
+        // Feedback de piscada em vermelho
         this.mesh.traverse((child) => {
-            if (child.isMesh && child.material) {
-                if (!child.userData.origColor && !Array.isArray(child.material)) {
-                    child.userData.origColor = child.material.color.clone();
-                }
-                
-                if (!Array.isArray(child.material)) {
-                    child.material.color.setHex(0xff0000);
-                }
-                
+            if (child.isMesh && child.material && !Array.isArray(child.material)) {
+                if (!child.userData.origColor) child.userData.origColor = child.material.color.clone();
+                child.material.color.setHex(0xff0000);
                 setTimeout(() => {
-                    if (child.material && child.userData.origColor && !Array.isArray(child.material)) {
-                        child.material.color.copy(child.userData.origColor);
-                    }
+                    if (child.material && child.userData.origColor) child.material.color.copy(child.userData.origColor);
                 }, 200);
             }
         });
@@ -136,6 +173,7 @@ export class Enemy {
 
     die() {
         this.isDead = true;
+        this.hpSprite.visible = false; // Esconde a barra de vida ao morrer
         this.playAnimation('death');
         
         this.game.questManager.onEnemyKilled(this.name);
@@ -154,7 +192,11 @@ export class Enemy {
             if (droppedItem) this.game.player.inventory.push(droppedItem);
             this.game.ui.updateHUD(this.game.player);
             
-            setTimeout(() => { this.game.scene.remove(this.mesh); }, 3000);
+            // Aguarda a animação terminar antes de apagar a malha (3 segundos)
+            setTimeout(() => { 
+                this.game.scene.remove(this.mesh); 
+                this.isDisposed = true; // Avisa a GameEngine que pode remover da lista
+            }, 3000);
         }, 1000);
     }
 }
