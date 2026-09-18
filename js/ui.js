@@ -10,6 +10,9 @@ export class UIManager {
         this.panelContent = document.getElementById('panel-content');
         this.btnClose = document.getElementById('btn-close-panel');
         this.interactionPrompt = document.getElementById('interaction-prompt');
+        
+        // NOVO: Referência ao Fade Screen
+        this.fadeScreen = document.getElementById('fade-screen');
 
         this.bindEvents();
     }
@@ -129,5 +132,19 @@ export class UIManager {
                 });
             });
         }, 0);
+    }
+
+    // NOVO: Controle de Fade
+    fade(isFadingOut, callback) {
+        if (isFadingOut) {
+            this.fadeScreen.classList.add('fade-active');
+        } else {
+            this.fadeScreen.classList.remove('fade-active');
+        }
+
+        // Aguarda os 0.8s da animação do CSS terminarem para rodar o callback
+        setTimeout(() => {
+            if (callback) callback();
+        }, 800);
     }
 }
