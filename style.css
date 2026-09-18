@@ -1,1 +1,121 @@
+/* Reset básico para evitar scroll e margens indesejadas na janela */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none; /* Impede seleção acidental de texto durante o jogo */
+}
 
+body {
+    overflow: hidden; 
+    background-color: #000;
+    color: #fff;
+    font-family: 'Courier New', Courier, monospace; /* Estética clássica RPG */
+}
+
+#game-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+/* Container de UI precisa bloquear interações de ponteiro apenas nos elementos visíveis,
+   deixando o clique passar para a câmera/mundo onde for transparente. */
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none; 
+}
+
+#player-stats {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border: 2px solid #666;
+    border-radius: 4px;
+    pointer-events: auto; /* Reativa cliques sobre o HUD */
+    text-shadow: 1px 1px 2px #000;
+}
+
+#player-stats p {
+    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#action-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(20, 20, 25, 0.95);
+    padding: 25px;
+    border: 4px solid #8b7355; /* Estilo de moldura medieval */
+    border-radius: 8px;
+    min-width: 450px;
+    min-height: 300px;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#panel-title {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #e2c08d;
+    border-bottom: 1px solid #8b7355;
+    padding-bottom: 10px;
+}
+
+#panel-content {
+    flex-grow: 1;
+    margin-bottom: 20px;
+}
+
+#btn-close-panel {
+    align-self: center;
+    padding: 10px 20px;
+    background: #4a1919;
+    color: #fff;
+    border: 1px solid #ff4444;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 16px;
+}
+
+#btn-close-panel:hover {
+    background: #662222;
+}
+
+#interaction-prompt {
+    position: absolute;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 20px;
+    border: 2px solid #e2c08d;
+    border-radius: 5px;
+    font-size: 20px;
+    pointer-events: none;
+    animation: pulse 1.5s infinite;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
