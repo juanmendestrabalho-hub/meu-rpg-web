@@ -331,6 +331,7 @@ export class GameEngine {
             });
         }
 
+        
         if (this.interactables) {
             this.interactables.forEach(npc => {
                 if (npc && npc.mesh && npc.mesh.userData && npc.mesh.userData.mixer) {
