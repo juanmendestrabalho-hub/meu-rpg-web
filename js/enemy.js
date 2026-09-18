@@ -104,16 +104,39 @@ export class Enemy {
 
     takeDamage(amount) {
         if (this.isDead) return;
+        
         const actualDamage = Math.max(1, amount - this.def);
         this.hp -= actualDamage;
 
-        if (this.hp <= 0) this.die();
+        // FEEDBACK VISUAL: Faz a malha piscar em vermelho
+        this.mesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+                if (!child.userData.origColor && !Array.isArray(child.material)) {
+                    child.userData.origColor = child.material.color.clone();
+                }
+                
+                if (!Array.isArray(child.material)) {
+                    child.material.color.setHex(0xff0000);
+                }
+                
+                setTimeout(() => {
+                    if (child.material && child.userData.origColor && !Array.isArray(child.material)) {
+                        child.material.color.copy(child.userData.origColor);
+                    }
+                }, 200);
+            }
+        });
+
+        if (this.hp <= 0) {
+            this.die();
+        }
     }
 
     die() {
         this.isDead = true;
         this.playAnimation('death');
         
+        // Rastreia a morte para a missão do Clérigo
         this.game.questManager.onEnemyKilled(this.name);
         
         setTimeout(() => {
