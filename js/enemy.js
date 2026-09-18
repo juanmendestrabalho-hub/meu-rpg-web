@@ -13,6 +13,7 @@ export class Enemy {
         this.speed = 3;
         this.attackTimer = 0;
         this.isDead = false;
+        this.isLoaded = false; // Flag de segurança
 
         this.mesh = new THREE.Group();
         this.mesh.position.set(x, 0, z);
@@ -43,17 +44,19 @@ export class Enemy {
                 });
                 this.playAnimation('idle');
             }
+            this.isLoaded = true;
         }, undefined, () => {
             const geo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
             const mat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
             const placeholder = new THREE.Mesh(geo, mat);
             placeholder.position.y = 0.9;
             this.mesh.add(placeholder);
+            this.isLoaded = true;
         });
     }
 
     playAnimation(name) {
-        if (!this.animations[name] || this.currentAction === this.animations[name]) return;
+        if (!this.mixer || !this.animations[name] || this.currentAction === this.animations[name]) return;
         
         const action = this.animations[name];
         if (this.currentAction) this.currentAction.fadeOut(0.2);
@@ -70,8 +73,8 @@ export class Enemy {
     }
 
     update(delta) {
+        if (!this.isLoaded || this.isDead || !this.game.player || !this.game.player.isLoaded) return;
         if (this.mixer) this.mixer.update(delta);
-        if (this.isDead || !this.game.player) return;
 
         if (this.attackTimer > 0) this.attackTimer -= delta;
 
@@ -103,12 +106,11 @@ export class Enemy {
     }
 
     takeDamage(amount) {
-        if (this.isDead) return;
+        if (this.isDead || !this.isLoaded) return;
         
         const actualDamage = Math.max(1, amount - this.def);
         this.hp -= actualDamage;
 
-        // FEEDBACK VISUAL: Faz a malha piscar em vermelho
         this.mesh.traverse((child) => {
             if (child.isMesh && child.material) {
                 if (!child.userData.origColor && !Array.isArray(child.material)) {
@@ -136,7 +138,6 @@ export class Enemy {
         this.isDead = true;
         this.playAnimation('death');
         
-        // Rastreia a morte para a missão do Clérigo
         this.game.questManager.onEnemyKilled(this.name);
         
         setTimeout(() => {
