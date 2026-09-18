@@ -56,7 +56,7 @@ export class Player {
             this.hp = 0;
             this.playAnimation('death');
             this.ui.updateHUD(this);
-            this.ui.openPanel("Fim de Jogo", "<p style='color:red;'>Você morreu!</p><p>Recarregue a página (ou aperte F5 para tentar carregar o último Save) para tentar novamente.</p>");
+            this.ui.openPanel("Fim de Jogo", "<p style='color:red;'>Você morreu!</p><p>Recarregue a página (ou aperte F5 para carregar o último Save) para tentar novamente.</p>");
             return;
         }
         this.ui.updateHUD(this);
@@ -71,11 +71,15 @@ export class Player {
         setTimeout(() => {
             let closestDist = Infinity;
             let target = null;
+            
             for (let i = 0; i < this.game.enemies.length; i++) {
                 const enemy = this.game.enemies[i];
                 if (enemy.isDead) continue;
+                
                 const dist = this.mesh.position.distanceTo(enemy.mesh.position);
-                if (dist < 3.0 && dist < closestDist) {
+                
+                // Hitbox ampliado para 4.5
+                if (dist < 4.5 && dist < closestDist) {
                     closestDist = dist;
                     target = enemy;
                 }
@@ -85,7 +89,7 @@ export class Player {
                 target.takeDamage(this.getTotalDamage());
             }
             this.isAttacking = false;
-        }, 500);
+        }, 500); 
     }
 
     // Ações de Inventário
@@ -231,7 +235,9 @@ export class Player {
 
         // Salvar Jogo [K]
         if (code === 'KeyK' && !isPressed && !this.ui.isPanelOpen()) {
-            this.game.saveManager.saveGame();
+            if (this.game.saveManager) {
+                this.game.saveManager.saveGame();
+            }
         }
     }
 
