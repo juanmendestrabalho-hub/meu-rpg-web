@@ -2,7 +2,7 @@ export class QuestManager {
     constructor(gameEngine) {
         this.game = gameEngine;
         this.state = {
-            mageQuestStatus: 'unstarted' // 'unstarted', 'active', 'artifact_found', 'completed'
+            mageQuestStatus: 'unstarted' 
         };
     }
 
@@ -63,7 +63,6 @@ export class QuestManager {
             if (btnComplete) {
                 btnComplete.addEventListener('click', () => {
                     this.state.mageQuestStatus = 'completed';
-                    // Dá as recompensas ao jogador e atualiza o HUD
                     this.game.player.coins += 100;
                     this.game.player.xp += 50;
                     this.game.ui.updateHUD(this.game.player);
@@ -77,15 +76,14 @@ export class QuestManager {
         }, 0);
     }
 
-    // Chamado pelo game.js quando o jogador tenta pegar o artefato no chão
     collectArtifact() {
         if (this.state.mageQuestStatus === 'active') {
             this.state.mageQuestStatus = 'artifact_found';
             this.game.ui.openPanel("Item Coletado", "<p>Você recuperou o Artefato Mágico! Retorne ao Mago.</p>");
-            return true; // Retorna true para avisar o game.js que o item pode sumir do chão
+            return true; 
         } else {
             this.game.ui.openPanel("Aviso", "<p>Este item exala poder, mas você não tem motivos para pegá-lo agora.</p>");
-            return false; // Retorna false para o item continuar no chão
+            return false; 
         }
     }
 }
