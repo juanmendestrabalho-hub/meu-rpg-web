@@ -3,14 +3,10 @@ import { generateItem } from './items.js';
 export class QuestManager {
     constructor(gameEngine) {
         this.game = gameEngine;
-        
-        // NOVO: Dicionário escalonável de missões
         this.quests = {
-            mageQuest: {
-                status: 'unstarted' // unstarted, active, artifact_found, completed
-            },
+            mageQuest: { status: 'unstarted' },
             clericQuest: {
-                status: 'unstarted', // unstarted, active, objective_met, completed
+                status: 'unstarted', 
                 targetEnemy: 'Ladino Sombrio',
                 targetCount: 2,
                 currentCount: 0
@@ -18,9 +14,6 @@ export class QuestManager {
         };
     }
 
-    // ----------------------------------------------------
-    // MISSÃO DE COLETA (MAGO)
-    // ----------------------------------------------------
     interactWithMage() {
         let title = "Mago Ancião";
         let content = "";
@@ -91,9 +84,6 @@ export class QuestManager {
         }
     }
 
-    // ----------------------------------------------------
-    // MISSÃO DE COMBATE (CLÉRIGO / MERCADOR)
-    // ----------------------------------------------------
     interactWithCleric() {
         const q = this.quests.clericQuest;
         let title = "Clérigo Mercador";
@@ -107,7 +97,6 @@ export class QuestManager {
             questButton = `<button id="btn-cleric-quest" style="padding: 10px; cursor: pointer; background: #2b5c2b; color: white; border: 2px solid #4CAF50; animation: pulse 1.5s infinite;">Entregar Missão</button>`;
         }
 
-        // Diálogo raiz do NPC de múltiplas funções
         let content = `
             <p>Que a luz guie seus passos. Deseja ver meus produtos ou precisa de algo mais?</p>
             <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
@@ -168,7 +157,6 @@ export class QuestManager {
                     this.game.player.coins += 150;
                     this.game.player.xp += 100;
                     
-                    // Entrega uma Armadura Rara como recompensa!
                     const rewardItem = generateItem('armor_iron', 'RARE');
                     this.game.player.inventory.push(rewardItem);
                     
@@ -180,24 +168,15 @@ export class QuestManager {
         }, 0);
     }
 
-    // ----------------------------------------------------
-    // NOVO: SISTEMA DE RASTREAMENTO DE ABATES (TRACKING)
-    // ----------------------------------------------------
     onEnemyKilled(enemyName) {
         const q = this.quests.clericQuest;
-        
-        // Se a missão estiver ativa e o inimigo for o alvo correto
         if (q.status === 'active' && enemyName === q.targetEnemy) {
             q.currentCount++;
-            console.log(`Missão Atualizada: ${q.currentCount}/${q.targetCount} ${enemyName}s derrotados.`);
-            
             if (q.currentCount >= q.targetCount) {
                 q.status = 'objective_met';
-                
-                // Exibe um aviso na tela para o jogador saber que concluiu
                 setTimeout(() => {
                     this.game.ui.openPanel("Objetivo Concluído!", `<p>Você derrotou os ${q.targetCount} ${q.targetEnemy}s!</p><p>Retorne ao Clérigo para sua recompensa.</p>`);
-                }, 2000); // Aparece 2 segundos após a tela de Loot
+                }, 2000); 
             }
         }
     }
