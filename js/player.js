@@ -28,7 +28,6 @@ export class Player {
         this.keys = { forward: false, backward: false, left: false, right: false };
         this.cameraOffset = new THREE.Vector3(0, 15, 10);
 
-        // Sistema de Animação
         this.mixer = null;
         this.animations = {};
         this.currentAction = null;
@@ -37,7 +36,6 @@ export class Player {
         this.setupMesh();
         this.setupControls();
         
-        // Itens iniciais
         this.inventory.push(generateItem('sword', 'COMMON'));
         this.inventory.push(generateItem('potion_hp', 'RARE'));
         this.ui.updateHUD(this);
@@ -126,18 +124,16 @@ export class Player {
         const placeholderMat = new THREE.MeshBasicMaterial({ color: 0x2244cc, wireframe: true });
         const placeholder = new THREE.Mesh(placeholderGeo, placeholderMat);
         placeholder.position.y = 0.9;
-        
         const faceGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
         const face = new THREE.Mesh(faceGeo, placeholderMat);
         face.position.set(0, 0.5, 0.4);
         placeholder.add(face);
-        
         this.mesh.add(placeholder);
         this.scene.add(this.mesh);
 
         const loader = new GLTFLoader();
         loader.load(
-            'assets/Guerreiro.gltf', // <-- MODELO DO JOGADOR AQUI
+            'assets/Guerreiro.gltf', 
             (gltf) => {
                 this.mesh.remove(placeholder);
                 const model = gltf.scene;
@@ -201,6 +197,11 @@ export class Player {
         if (code === 'KeyD' || code === 'ArrowRight') this.keys.right = isPressed;
 
         if (code === 'KeyE' && isPressed && this.nearestInteractable && !this.ui.isPanelOpen()) this.nearestInteractable.onInteract();
+        
+        if (code === 'KeyR' && isPressed && this.nearestInteractable && !this.ui.isPanelOpen()) {
+            this.game.stealthManager.attemptSteal(this.nearestInteractable);
+        }
+
         if (code === 'Space' && isPressed && !this.ui.isPanelOpen() && !this.isAttacking) this.attack();
         if (code === 'KeyI' && !isPressed) {
             if (!this.ui.isPanelOpen()) this.ui.openInventory(this);
@@ -263,7 +264,7 @@ export class Player {
         }
         if (this.nearestInteractable !== closestObj) {
             this.nearestInteractable = closestObj;
-            this.ui.showInteractionPrompt(this.nearestInteractable !== null);
+            this.ui.showInteractionPrompt(this.nearestInteractable);
         }
     }
 }
