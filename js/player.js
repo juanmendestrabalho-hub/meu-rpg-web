@@ -11,7 +11,6 @@ export class Player {
         this.interactables = game.interactables; 
         this.ui = game.ui; 
 
-        // Status base
         this.maxHp = 100;
         this.hp = 100;
         this.xp = 0;
@@ -20,7 +19,6 @@ export class Player {
         this.baseDamage = 5;
         this.baseDefense = 0;
 
-        // Inventário e Equipamento
         this.inventory = [];
         this.equipment = { weapon: null, armor: null };
 
@@ -30,22 +28,26 @@ export class Player {
         this.keys = { forward: false, backward: false, left: false, right: false };
         this.cameraOffset = new THREE.Vector3(0, 15, 10);
 
-        // Sistema de Animação
         this.mixer = null;
         this.animations = {};
         this.currentAction = null;
         this.isAttacking = false;
+        
+        // Flag de segurança para saber se o 3D já carregou
+        this.isLoaded = false; 
+
+        this.mesh = new THREE.Group();
+        this.mesh.position.y = 0;
+        this.scene.add(this.mesh);
 
         this.setupMesh();
         this.setupControls();
         
-        // Itens iniciais
         this.inventory.push(generateItem('sword', 'COMMON'));
         this.inventory.push(generateItem('potion_hp', 'RARE'));
         this.ui.updateHUD(this);
     }
 
-    // Cálculos de combate
     getTotalDamage() { return this.baseDamage + (this.equipment.weapon ? this.equipment.weapon.damage : 0); }
     getTotalDefense() { return this.baseDefense + (this.equipment.armor ? this.equipment.armor.defense : 0); }
 
@@ -56,14 +58,14 @@ export class Player {
             this.hp = 0;
             this.playAnimation('death');
             this.ui.updateHUD(this);
-            this.ui.openPanel("Fim de Jogo", "<p style='color:red;'>Você morreu!</p><p>Recarregue a página (ou aperte F5 para carregar o último Save) para tentar novamente.</p>");
+            this.ui.openPanel("Fim de Jogo", "<p style='color:red;'>Você morreu!</p><p>Recarregue a página (ou aperte F5 para tentar carregar o último Save) para tentar novamente.</p>");
             return;
         }
         this.ui.updateHUD(this);
     }
 
     attack() {
-        if (this.isAttacking) return;
+        if (this.isAttacking || !this.isLoaded) return;
         
         this.isAttacking = true;
         this.playAnimation('attack');
@@ -71,14 +73,10 @@ export class Player {
         setTimeout(() => {
             let closestDist = Infinity;
             let target = null;
-            
             for (let i = 0; i < this.game.enemies.length; i++) {
                 const enemy = this.game.enemies[i];
-                if (enemy.isDead) continue;
-                
+                if (enemy.isDead || !enemy.isLoaded) continue; // Adicionado check de isLoaded no inimigo
                 const dist = this.mesh.position.distanceTo(enemy.mesh.position);
-                
-                // Hitbox ampliado para 4.5
                 if (dist < 4.5 && dist < closestDist) {
                     closestDist = dist;
                     target = enemy;
@@ -89,10 +87,9 @@ export class Player {
                 target.takeDamage(this.getTotalDamage());
             }
             this.isAttacking = false;
-        }, 500); 
+        }, 500);
     }
 
-    // Ações de Inventário
     equipItem(uuid) {
         const itemIndex = this.inventory.findIndex(i => i.uuid === uuid);
         if (itemIndex === -1) return;
@@ -127,24 +124,12 @@ export class Player {
     }
 
     setupMesh() {
-        this.mesh = new THREE.Group();
-        this.mesh.position.y = 0;
-
-        // Placeholder temporário
         const placeholderGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
         const placeholderMat = new THREE.MeshBasicMaterial({ color: 0x2244cc, wireframe: true });
         const placeholder = new THREE.Mesh(placeholderGeo, placeholderMat);
         placeholder.position.y = 0.9;
-        
-        const faceGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-        const face = new THREE.Mesh(faceGeo, placeholderMat);
-        face.position.set(0, 0.5, 0.4);
-        placeholder.add(face);
-        
         this.mesh.add(placeholder);
-        this.scene.add(this.mesh);
 
-        // Carregando o Modelo Real 3D (Guerreiro)
         const loader = new GLTFLoader();
         loader.load(
             'assets/Guerreiro.gltf', 
@@ -156,7 +141,6 @@ export class Player {
                 });
                 this.mesh.add(model);
 
-                // Configuração das animações
                 if (gltf.animations && gltf.animations.length > 0) {
                     this.mixer = new THREE.AnimationMixer(model);
                     gltf.animations.forEach((clip) => {
@@ -168,14 +152,18 @@ export class Player {
                     });
                     this.playAnimation('idle');
                 }
+                this.isLoaded = true; // Marca como carregado
             },
             undefined, 
-            () => { console.warn("Modelo 'assets/Guerreiro.gltf' não encontrado. Mantendo placeholder."); }
+            () => { 
+                console.warn("Modelo 'assets/Guerreiro.gltf' não encontrado. Mantendo placeholder."); 
+                this.isLoaded = true; // Mesmo com placeholder, libera o movimento
+            }
         );
     }
 
     playAnimation(name) {
-        if (!this.animations[name] || this.currentAction === this.animations[name]) return;
+        if (!this.mixer || !this.animations[name] || this.currentAction === this.animations[name]) return;
         
         const action = this.animations[name];
         if (this.currentAction) {
@@ -193,10 +181,12 @@ export class Player {
         this.currentAction = action;
 
         if (name === 'attack') {
-            this.mixer.addEventListener('finished', () => {
+            const onFinish = () => {
                 this.isAttacking = false;
                 this.playAnimation('idle');
-            });
+                this.mixer.removeEventListener('finished', onFinish);
+            };
+            this.mixer.addEventListener('finished', onFinish);
         }
     }
 
@@ -206,34 +196,30 @@ export class Player {
     }
 
     handleKey(code, isPressed) {
-        // Movimentação
+        if (!this.isLoaded) return; // Bloqueia inputs até carregar
+
         if (code === 'KeyW' || code === 'ArrowUp') this.keys.forward = isPressed;
         if (code === 'KeyS' || code === 'ArrowDown') this.keys.backward = isPressed;
         if (code === 'KeyA' || code === 'ArrowLeft') this.keys.left = isPressed;
         if (code === 'KeyD' || code === 'ArrowRight') this.keys.right = isPressed;
 
-        // Interação [E]
         if (code === 'KeyE' && isPressed && this.nearestInteractable && !this.ui.isPanelOpen()) {
             this.nearestInteractable.onInteract();
         }
         
-        // Furtividade/Roubo [R]
         if (code === 'KeyR' && isPressed && this.nearestInteractable && !this.ui.isPanelOpen()) {
             this.game.stealthManager.attemptSteal(this.nearestInteractable);
         }
 
-        // Combate [Espaço]
         if (code === 'Space' && isPressed && !this.ui.isPanelOpen() && !this.isAttacking) {
             this.attack();
         }
         
-        // Inventário [I]
         if (code === 'KeyI' && !isPressed) {
             if (!this.ui.isPanelOpen()) this.ui.openInventory(this);
             else this.ui.closePanel();
         }
 
-        // Salvar Jogo [K]
         if (code === 'KeyK' && !isPressed && !this.ui.isPanelOpen()) {
             if (this.game.saveManager) {
                 this.game.saveManager.saveGame();
@@ -242,6 +228,8 @@ export class Player {
     }
 
     update(delta) {
+        if (!this.isLoaded) return; // Espera carregar o modelo
+
         if (this.mixer) this.mixer.update(delta);
         if (this.ui.isPanelOpen() || this.hp <= 0) return; 
 
@@ -270,13 +258,19 @@ export class Player {
             this.playAnimation('idle'); 
         }
 
+        // Atualiza Câmera
         this.camera.position.copy(this.mesh.position).add(this.cameraOffset);
         this.camera.lookAt(this.mesh.position);
+        
         this.checkInteractables();
     }
 
     checkCollisions() {
+        if(this.collidables.length === 0) return false;
+        
         for (let i = 0; i < this.collidables.length; i++) {
+            if(!this.collidables[i]) continue;
+            // Cria a box apenas se o objeto for válido
             const objectBox = new THREE.Box3().setFromObject(this.collidables[i]);
             if (this.playerBox.intersectsBox(objectBox)) return true; 
         }
@@ -286,14 +280,18 @@ export class Player {
     checkInteractables() {
         let closestDist = Infinity;
         let closestObj = null;
+        
         for (let i = 0; i < this.interactables.length; i++) {
             const interactable = this.interactables[i];
+            if(!interactable || !interactable.mesh) continue;
+
             const dist = this.mesh.position.distanceTo(interactable.mesh.position);
             if (dist < 3.5 && dist < closestDist) {
                 closestDist = dist;
                 closestObj = interactable;
             }
         }
+        
         if (this.nearestInteractable !== closestObj) {
             this.nearestInteractable = closestObj;
             this.ui.showInteractionPrompt(this.nearestInteractable);
