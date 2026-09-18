@@ -1,215 +1,136 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Player } from './player.js';
-import { UIManager } from './ui.js'; 
-import { QuestManager } from './quests.js'; 
-import { ShopManager } from './shop.js'; 
-import { Enemy } from './enemy.js'; 
+import { generateItem } from './items.js';
 
-export class GameEngine {
-    constructor() {
-        this.container = document.getElementById('game-container');
-        this.ui = new UIManager();
-        this.questManager = new QuestManager(this); 
-        this.shopManager = new ShopManager(this); 
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x87CEEB); 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true }); 
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.shadowMap.enabled = true; 
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-        this.container.appendChild(this.renderer.domElement);
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.clock = new THREE.Clock();
+export class Enemy {
+    constructor(game, name, x, z, hp, atk, def, modelPath) {
+        this.game = game; 
+        this.name = name;
+        this.maxHp = hp;
+        this.hp = hp;
+        this.atk = atk;
+        this.def = def;
+        this.speed = 3;
+        this.attackTimer = 0;
+        this.isDead = false;
+
+        this.mesh = new THREE.Group();
+        this.mesh.position.set(x, 0, z);
         
-        this.collidables = [];
-        this.interactables = []; 
-        this.visualItems = []; 
-        this.enemies = []; 
-        this.gltfLoader = new GLTFLoader();
+        this.mixer = null;
+        this.animations = {};
+        this.currentAction = null;
 
-        this.setupEnvironment();
-        this.setupLights();
-        
-        this.player = new Player(this);
-        
-        this.bindEvents();
-    }
+        this.game.scene.add(this.mesh);
+        this.enemyBox = new THREE.Box3();
 
-    spawnEnemy(name, x, z, hp, atk, def, modelPath) {
-        const enemy = new Enemy(this, name, x, z, hp, atk, def, modelPath);
-        this.enemies.push(enemy);
-    }
-
-    createNPC(x, z, colorHex, modelPath, onInteractCallback) {
-        const npcGroup = new THREE.Group();
-        npcGroup.position.set(x, 0, z);
-
-        const placeholderGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
-        const placeholderMat = new THREE.MeshStandardMaterial({ color: colorHex, wireframe: true });
-        const placeholder = new THREE.Mesh(placeholderGeo, placeholderMat);
-        placeholder.position.y = 0.9;
-        npcGroup.add(placeholder);
-        
-        this.scene.add(npcGroup);
-        this.collidables.push(npcGroup);
-        this.interactables.push({
-            mesh: npcGroup,
-            onInteract: onInteractCallback
-        });
-
-        this.gltfLoader.load(modelPath, (gltf) => {
-            npcGroup.remove(placeholder);
+        const loader = new GLTFLoader();
+        loader.load(modelPath, (gltf) => {
             const model = gltf.scene;
             model.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
+                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
             });
-            
-            // Tratamento de animação (Idle) para os NPCs ficarem respirando e vivos!
+            this.mesh.add(model);
+
             if (gltf.animations && gltf.animations.length > 0) {
-                const mixer = new THREE.AnimationMixer(model);
-                const idleClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('idle'));
-                if (idleClip) {
-                    mixer.clipAction(idleClip).play();
-                    // Adiciona o mixer ao objeto para ser atualizado no loop do game
-                    npcGroup.userData.mixer = mixer;
-                }
+                this.mixer = new THREE.AnimationMixer(model);
+                gltf.animations.forEach((clip) => {
+                    const animName = clip.name.toLowerCase();
+                    if (animName.includes('idle')) this.animations['idle'] = this.mixer.clipAction(clip);
+                    if (animName.includes('run') || animName.includes('walk')) this.animations['run'] = this.mixer.clipAction(clip);
+                    if (animName.includes('attack') || animName.includes('slash')) this.animations['attack'] = this.mixer.clipAction(clip);
+                    if (animName.includes('death') || animName.includes('die')) this.animations['death'] = this.mixer.clipAction(clip);
+                });
+                this.playAnimation('idle');
             }
-
-            npcGroup.add(model);
         }, undefined, () => {
-            console.warn(`Modelo ${modelPath} ausente. Usando placeholder.`);
+            const geo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
+            const placeholder = new THREE.Mesh(geo, mat);
+            placeholder.position.y = 0.9;
+            this.mesh.add(placeholder);
         });
     }
 
-    spawnItem(x, z, color, onCollectCallback) {
-        const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const mat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.4 });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(x, 0.5, z); 
-        mesh.castShadow = true;
-        this.scene.add(mesh);
-        this.visualItems.push(mesh);
-
-        const itemObj = {
-            mesh: mesh,
-            onInteract: () => {
-                const wasConsumed = onCollectCallback();
-                if (wasConsumed) {
-                    this.scene.remove(mesh);
-                    const index = this.interactables.indexOf(itemObj);
-                    if (index > -1) this.interactables.splice(index, 1);
-                    if (this.player && this.player.nearestInteractable === itemObj) {
-                        this.player.nearestInteractable = null;
-                        this.ui.showInteractionPrompt(false);
-                    }
-                }
-            }
-        };
-        this.interactables.push(itemObj);
-    }
-
-    setupEnvironment() {
-        // Chão e mundo
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x4a7c59, roughness: 0.8 });
-        this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        this.ground.rotation.x = -Math.PI / 2;
-        this.ground.receiveShadow = true; 
-        this.scene.add(this.ground);
-
-        const wallGeo = new THREE.BoxGeometry(2, 2, 2);
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b8c89 });
-        const wall = new THREE.Mesh(wallGeo, wallMat);
-        wall.position.set(5, 1, -5);
-        wall.castShadow = true; wall.receiveShadow = true;   
-        this.collidables.push(wall); this.scene.add(wall);
-
-        // NPCs com os Modelos Reais (.gltf)
-        this.createNPC(-5, -2, 0x8A2BE2, 'assets/Mago.gltf', () => this.questManager.interactWithMage());
-        this.createNPC(6, 3, 0xffaa00, 'assets/Clérigo.gltf', () => this.shopManager.openShop());
-
-        // Inimigos com os Modelos Reais (.gltf)
-        this.spawnEnemy("Ladino Sombrio", 12, -10, 60, 10, 2, 'assets/Ladino.gltf');
-        this.spawnEnemy("Arqueiro Renegado", -15, 12, 30, 5, 0, 'assets/Arqueiro.gltf');
-
-        // Itens espalhados pelo mapa
-        this.spawnItem(4, 3, 0xff0000, () => {
-            if (this.player.hp >= 100) {
-                this.ui.openPanel("Aviso", "<p>Sua vida já está cheia!</p>");
-                return false; 
-            }
-            this.player.hp = Math.min(100, this.player.hp + 20);
-            this.ui.updateHUD(this.player);
-            this.ui.openPanel("Poção de Vida", "<p>Você recuperou 20 HP.</p>");
-            return true; 
-        });
-
-        this.spawnItem(0, 5, 0x006400, () => {
-            this.player.hp -= 30;
-            this.ui.updateHUD(this.player);
-            this.ui.openPanel("Armadilha!", "<p>Você tocou em um lodo venenoso. Perdeu 30 HP!</p>");
-            return true;
-        });
-
-        this.spawnItem(-8, -8, 0xffaa00, () => {
-            return this.questManager.collectArtifact();
-        });
-    }
-
-    setupLights() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        this.scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(10, 20, 10);
-        dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 50;
-        dirLight.shadow.camera.left = -20; dirLight.shadow.camera.right = 20;
-        dirLight.shadow.camera.top = 20; dirLight.shadow.camera.bottom = -20;
-        this.scene.add(dirLight);
-    }
-
-    bindEvents() {
-        window.addEventListener('resize', this.onWindowResize.bind(this));
-    }
-
-    onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    start() {
-        this.renderer.setAnimationLoop(this.update.bind(this));
-    }
-
-    update() {
-        const delta = this.clock.getDelta();
+    playAnimation(name) {
+        if (!this.animations[name] || this.currentAction === this.animations[name]) return;
         
-        if (this.player) this.player.update(delta);
+        const action = this.animations[name];
+        if (this.currentAction) this.currentAction.fadeOut(0.2);
         
-        this.enemies.forEach(enemy => enemy.update(delta));
-        this.enemies = this.enemies.filter(enemy => !enemy.isDead);
-        
-        // Atualiza a rotação dos itens e a animação dos NPCs (Idle)
-        this.visualItems.forEach(itemMesh => {
-            if (itemMesh.parent) { 
-                itemMesh.rotation.y += delta * 1.5;
-                itemMesh.rotation.x += delta * 1.0;
-            }
-        });
+        if (name === 'attack' || name === 'death') {
+            action.setLoop(THREE.LoopOnce);
+            action.clampWhenFinished = true;
+        } else {
+            action.setLoop(THREE.LoopRepeat);
+        }
 
-        // Loop nos NPCs para rodar as animações caso eles tenham!
-        this.interactables.forEach(npc => {
-            if (npc.mesh && npc.mesh.userData && npc.mesh.userData.mixer) {
-                npc.mesh.userData.mixer.update(delta);
+        action.reset().fadeIn(0.2).play();
+        this.currentAction = action;
+    }
+
+    update(delta) {
+        if (this.mixer) this.mixer.update(delta);
+        if (this.isDead || !this.game.player) return;
+
+        if (this.attackTimer > 0) this.attackTimer -= delta;
+
+        const playerPos = this.game.player.mesh.position;
+        const dist = this.mesh.position.distanceTo(playerPos);
+
+        if (dist < 10 && dist > 1.8) {
+            const direction = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
+            direction.y = 0; 
+            direction.normalize();
+
+            this.mesh.position.x += direction.x * this.speed * delta;
+            this.mesh.position.z += direction.z * this.speed * delta;
+            this.mesh.lookAt(playerPos.x, this.mesh.position.y, playerPos.z);
+            
+            if (this.attackTimer <= 0) this.playAnimation('run');
+        } 
+        else if (dist <= 1.8) {
+            if (this.attackTimer <= 0) {
+                this.playAnimation('attack');
+                setTimeout(() => { if(!this.isDead) this.game.player.takeDamage(this.atk); }, 500);
+                this.attackTimer = 1.5; 
             }
-        });
+        } else {
+            this.playAnimation('idle');
+        }
+
+        this.enemyBox.setFromObject(this.mesh);
+    }
+
+    takeDamage(amount) {
+        if (this.isDead) return;
+        const actualDamage = Math.max(1, amount - this.def);
+        this.hp -= actualDamage;
+
+        if (this.hp <= 0) this.die();
+    }
+
+    die() {
+        this.isDead = true;
+        this.playAnimation('death');
         
-        this.renderer.render(this.scene, this.camera);
+        this.game.questManager.onEnemyKilled(this.name);
+        
+        setTimeout(() => {
+            const xpGained = 30;
+            const coinsGained = Math.floor(Math.random() * 15) + 10;
+            this.game.player.xp += xpGained;
+            this.game.player.coins += coinsGained;
+            
+            const roll = Math.random();
+            let droppedItem = null;
+            if (roll > 0.90) droppedItem = generateItem('axe', 'RARE');
+            else if (roll > 0.50) droppedItem = generateItem('potion_hp', 'COMMON'); 
+
+            if (droppedItem) this.game.player.inventory.push(droppedItem);
+            this.game.ui.updateHUD(this.game.player);
+            
+            setTimeout(() => { this.game.scene.remove(this.mesh); }, 3000);
+        }, 1000);
     }
 }
