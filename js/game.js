@@ -33,7 +33,6 @@ export class GameEngine {
         this.visualItems = []; 
         this.enemies = []; 
         
-        // NOVO: Gerenciamento de Zonas (Fases)
         this.levelObjects = []; 
         this.portals = [];
         this.isTransitioning = false;
@@ -43,24 +42,24 @@ export class GameEngine {
 
         this.setupLights();
         
+        // 1. Cria o jogador primeiro
         this.player = new Player(this);
         
-        // Inicializa a primeira fase ou carrega o Save
+        // 2. Carrega o mapa/save DEPOIS do jogador existir
         if (!this.saveManager.loadGame()) {
             this.loadLevel('village');
         }
         
         this.ui.updateHUD(this.player);
         this.bindEvents();
+        
+        // 3. Inicia o loop renderizador por último
+        this.start();
     }
-
-    // ==========================================
-    // SISTEMA DE NÍVEIS (LEVEL DESIGN)
-    // ==========================================
 
     clearLevel() {
         this.levelObjects.forEach(obj => {
-            if (obj.parent) this.scene.remove(obj);
+            if (obj && obj.parent) this.scene.remove(obj);
         });
         
         this.levelObjects.length = 0;
@@ -83,7 +82,7 @@ export class GameEngine {
 
     buildMap(levelMatrix, wallColorHex) {
         const tileSize = 3; 
-        const wallGeo = new THREE.BoxGeometry(tileSize, 3, tileSize); 
+        const wallGeo = new THREE.BoxGeometry(tileSize, 4, tileSize); 
         const wallMat = new THREE.MeshStandardMaterial({ color: wallColorHex }); 
         
         const offsetX = -(levelMatrix[0].length * tileSize) / 2;
@@ -93,7 +92,7 @@ export class GameEngine {
             for (let x = 0; x < levelMatrix[z].length; x++) {
                 if (levelMatrix[z][x] === 1) {
                     const wall = new THREE.Mesh(wallGeo, wallMat);
-                    wall.position.set(offsetX + (x * tileSize), 1.5, offsetZ + (z * tileSize));
+                    wall.position.set(offsetX + (x * tileSize), 2, offsetZ + (z * tileSize));
                     wall.castShadow = true; 
                     wall.receiveShadow = true;   
                     this.collidables.push(wall); 
@@ -117,7 +116,9 @@ export class GameEngine {
     }
 
     transitionToLevel(levelId) {
+        if (this.isTransitioning) return;
         this.isTransitioning = true;
+        
         this.ui.fade(true, () => {
             this.loadLevel(levelId);
             setTimeout(() => {
@@ -136,49 +137,44 @@ export class GameEngine {
             this.scene.background = new THREE.Color(0x87CEEB); 
             this.createGround(0x4a7c59); 
             
-            const mapMatrix = [
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-            ];
+            const mapMatrix = Array(15).fill(0).map((_, i) => {
+                let row = Array(15).fill(0);
+                if (i === 0 || i === 14) row = Array(15).fill(1);
+                row[0] = 1; row[14] = 1;
+                return row;
+            });
             this.buildMap(mapMatrix, 0x8b8c89); 
 
-            this.createNPC("Mago Ancião", -6, -2, 0x8A2BE2, 'assets/Mago.gltf', () => this.questManager.interactWithMage(), 150, 25, 5);
-            this.createNPC("Clérigo Mercador", 6, 2, 0xffaa00, 'assets/Clérigo.gltf', () => this.questManager.interactWithCleric(), 120, 15, 10);
+            this.createNPC("Mago Ancião", -8, -5, 0x8A2BE2, 'assets/Mago.gltf', () => this.questManager.interactWithMage(), 150, 25, 5);
+            this.createNPC("Clérigo Mercador", 8, 5, 0xffaa00, 'assets/Clérigo.gltf', () => this.questManager.interactWithCleric(), 120, 15, 10);
             
-            // O Portal para a Masmorra (Roxo)
-            this.spawnPortal(0, -10, 'dungeon', 0xaa00ff);
+            this.spawnPortal(0, -15, 'dungeon', 0xaa00ff);
             
-            if (this.player) this.player.mesh.position.set(0, 0, 8);
+            if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, 10);
 
         } 
         else if (levelId === 'dungeon') {
             this.scene.background = new THREE.Color(0x0a0a0a); 
             this.createGround(0x222222); 
             
-            const mapMatrix = [
-                [1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 1, 0, 0, 1, 0, 1],
-                [1, 0, 1, 0, 0, 1, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1]
-            ];
+            const mapMatrix = Array(15).fill(0).map((_, i) => {
+                let row = Array(15).fill(0);
+                if (i === 0 || i === 14) row = Array(15).fill(1);
+                row[0] = 1; row[14] = 1;
+                return row;
+            });
+            mapMatrix[4][4] = 1; mapMatrix[4][10] = 1;
+            mapMatrix[10][4] = 1; mapMatrix[10][10] = 1;
+            
             this.buildMap(mapMatrix, 0x111111);
 
-            this.spawnEnemy("Ladino Sombrio", 4, -4, 60, 10, 2, 'assets/Ladino.gltf');
-            this.spawnEnemy("Ladino Sombrio", -4, -4, 60, 10, 2, 'assets/Ladino.gltf');
-            this.spawnEnemy("Arqueiro Sombrio", 0, -8, 40, 15, 1, 'assets/Arqueiro.gltf');
+            this.spawnEnemy("Ladino Sombrio", 8, -8, 60, 10, 2, 'assets/Ladino.gltf');
+            this.spawnEnemy("Ladino Sombrio", -8, -8, 60, 10, 2, 'assets/Ladino.gltf');
+            this.spawnEnemy("Arqueiro Sombrio", 0, -12, 40, 15, 1, 'assets/Arqueiro.gltf');
             
-            // O Portal de volta para a Vila (Azul)
-            this.spawnPortal(0, 7, 'village', 0x00aaff);
+            this.spawnPortal(0, 15, 'village', 0x00aaff);
             
-            if (this.player) this.player.mesh.position.set(0, 0, 4);
+            if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, -10);
         }
     }
 
@@ -260,40 +256,53 @@ export class GameEngine {
     }
 
     start() {
-        this.renderer.setAnimationLoop(this.update.bind(this));
+        // Usa o requestAnimationFrame ao invés de setAnimationLoop para maior controle
+        const animate = () => {
+            requestAnimationFrame(animate);
+            this.update();
+        };
+        animate();
     }
 
     update() {
+        if (!this.clock) return; // Segurança
         const delta = this.clock.getDelta();
         
         if (this.player) this.player.update(delta);
         
-        this.enemies.forEach(enemy => enemy.update(delta));
-        this.enemies = this.enemies.filter(enemy => !enemy.isDead);
+        if (this.enemies) {
+            this.enemies.forEach(enemy => { if(enemy && enemy.update) enemy.update(delta); });
+            this.enemies = this.enemies.filter(enemy => enemy && !enemy.isDead);
+        }
         
-        this.visualItems.forEach(itemMesh => {
-            if (itemMesh.parent) { 
-                itemMesh.rotation.y += delta * 1.5;
-                itemMesh.rotation.x += delta * 1.0;
-            }
-        });
+        if (this.visualItems) {
+            this.visualItems.forEach(itemMesh => {
+                if (itemMesh && itemMesh.parent) { 
+                    itemMesh.rotation.y += delta * 1.5;
+                    itemMesh.rotation.x += delta * 1.0;
+                }
+            });
+        }
 
-        this.interactables.forEach(npc => {
-            if (npc.mesh && npc.mesh.userData && npc.mesh.userData.mixer) {
-                npc.mesh.userData.mixer.update(delta);
-            }
-        });
+        if (this.interactables) {
+            this.interactables.forEach(npc => {
+                if (npc && npc.mesh && npc.mesh.userData && npc.mesh.userData.mixer) {
+                    npc.mesh.userData.mixer.update(delta);
+                }
+            });
+        }
 
-        // NOVO: Detecção de colisão com o Portal Mágico
-        if (!this.isTransitioning && this.player) {
+        if (!this.isTransitioning && this.player && this.player.mesh) {
             for (let p of this.portals) {
-                if (this.player.mesh.position.distanceTo(p.mesh.position) < 2.0) {
+                if (p && p.mesh && this.player.mesh.position.distanceTo(p.mesh.position) < 2.0) {
                     this.transitionToLevel(p.target);
                     break;
                 }
             }
         }
         
-        this.renderer.render(this.scene, this.camera);
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 }
