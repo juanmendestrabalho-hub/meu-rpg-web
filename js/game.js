@@ -41,6 +41,7 @@ export class GameEngine {
         this.gltfLoader = new GLTFLoader();
 
         this.setupLights();
+        
         this.player = new Player(this);
         
         if (!this.saveManager.loadGame()) {
@@ -75,7 +76,6 @@ export class GameEngine {
         this.levelObjects.push(ground); 
     }
 
-    // OTIMIZAÇÃO: Usando InstancedMesh para renderizar o mapa todo de uma vez só
     buildMap(levelMatrix, wallColorHex) {
         const tileSize = 3; 
         const wallGeo = new THREE.BoxGeometry(tileSize, 4, tileSize); 
@@ -104,7 +104,6 @@ export class GameEngine {
                     dummy.updateMatrix();
                     instancedMesh.setMatrixAt(i, dummy.matrix);
                     
-                    // Colisão Invisível e ultraleve para o player não atravessar
                     const colMesh = new THREE.Mesh(wallGeo, new THREE.MeshBasicMaterial({visible: false}));
                     colMesh.position.copy(dummy.position);
                     this.collidables.push(colMesh);
@@ -145,6 +144,34 @@ export class GameEngine {
         });
     }
 
+    spawnItem(x, z, colorHex, onCollectCallback) {
+        const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const mat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.4 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, 0.5, z); 
+        mesh.castShadow = true;
+        this.scene.add(mesh);
+        this.visualItems.push(mesh);
+        this.levelObjects.push(mesh);
+
+        const itemObj = {
+            mesh: mesh,
+            onInteract: () => {
+                const wasConsumed = onCollectCallback();
+                if (wasConsumed) {
+                    this.scene.remove(mesh);
+                    const index = this.interactables.indexOf(itemObj);
+                    if (index > -1) this.interactables.splice(index, 1);
+                    if (this.player && this.player.nearestInteractable === itemObj) {
+                        this.player.nearestInteractable = null;
+                        this.ui.showInteractionPrompt(false);
+                    }
+                }
+            }
+        };
+        this.interactables.push(itemObj);
+    }
+
     loadLevel(levelId) {
         this.clearLevel();
         this.currentLevel = levelId;
@@ -164,7 +191,11 @@ export class GameEngine {
             this.createNPC("Mago Ancião", -8, -5, 0x8A2BE2, 'assets/Mago.gltf', () => this.questManager.interactWithMage(), 150, 25, 5);
             this.createNPC("Clérigo Mercador", 8, 5, 0xffaa00, 'assets/Clérigo.gltf', () => this.questManager.interactWithCleric(), 120, 15, 10);
             
+            this.createNPC("O Caçador", -10, 8, 0x228B22, 'assets/Arqueiro.gltf', () => this.questManager.interactWithHunter(), 150, 20, 5);
+            this.createNPC("Ladino Misterioso", 12, -10, 0x333333, 'assets/Ladino.gltf', () => this.questManager.interactWithThief(), 150, 25, 10);
+
             this.spawnPortal(0, -15, 'dungeon', 0xaa00ff);
+            
             if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, 10);
 
         } 
@@ -182,21 +213,19 @@ export class GameEngine {
             mapMatrix[10][4] = 1; mapMatrix[10][10] = 1;
             this.buildMap(mapMatrix, 0x111111);
 
-            // Inimigos Normais
             this.spawnEnemy("Ladino Sombrio", 8, -8, 60, 10, 2, 'assets/Ladino.gltf');
             this.spawnEnemy("Ladino Sombrio", -8, -8, 60, 10, 2, 'assets/Ladino.gltf');
             this.spawnEnemy("Arqueiro Sombrio", 0, -12, 40, 15, 1, 'assets/Arqueiro.gltf');
             
-            // O Spawn do Chefe Rei Orc no fundo da masmorra
             this.spawnEnemy("Rei Orc", 0, -6, 200, 25, 5, 'assets/Orc.gltf');
             
             this.spawnPortal(0, 15, 'village', 0x00aaff);
+            
             if (this.player && this.player.mesh) this.player.mesh.position.set(0, 0, -10);
         }
     }
 
     spawnEnemy(name, x, z, hp, atk, def, modelPath) {
-        // Tenta usar o orc se for o chefe, se o arquivo não existir ou falhar, usa o fallback nativo.
         const path = name === "Rei Orc" ? 'assets/Orc.gltf' : modelPath;
         const enemy = new Enemy(this, name, x, z, hp, atk, def, path);
         this.enemies.push(enemy);
@@ -288,7 +317,6 @@ export class GameEngine {
         
         if (this.player) this.player.update(delta);
         
-        // O Filtro de Inimigos agora respeita o tempo da animação de morte!
         if (this.enemies) {
             this.enemies.forEach(enemy => { if(enemy && enemy.update) enemy.update(delta); });
             this.enemies = this.enemies.filter(enemy => enemy && !enemy.isDisposed);
