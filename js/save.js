@@ -5,8 +5,8 @@ export class SaveManager {
     }
 
     saveGame() {
-        // Coleta todos os dados importantes
         const saveData = {
+            level: this.game.currentLevel, // NOVO: Salva o ID da fase atual
             player: {
                 hp: this.game.player.hp,
                 xp: this.game.player.xp,
@@ -19,9 +19,8 @@ export class SaveManager {
             quests: this.game.questManager.quests
         };
 
-        // Converte para String e salva no navegador
         localStorage.setItem(this.saveKey, JSON.stringify(saveData));
-        this.game.ui.openPanel("Progresso Salvo!", "<p>Seu jogo foi salvo com sucesso.</p><p>Você pode fechar o navegador e continuar de onde parou depois.</p>");
+        this.game.ui.openPanel("Progresso Salvo!", "<p>Seu jogo foi salvo com sucesso.</p>");
     }
 
     loadGame() {
@@ -30,29 +29,30 @@ export class SaveManager {
         if (savedString) {
             const data = JSON.parse(savedString);
 
-            // Restaura o Jogador
+          //carrega o mapa correto ANTES de posicionar o jogador
+            if (data.level) {
+                this.game.loadLevel(data.level);
+            } else {
+                this.game.loadLevel('village');
+            }
+
             this.game.player.hp = data.player.hp;
             this.game.player.xp = data.player.xp;
             this.game.player.coins = data.player.coins;
             this.game.player.inventory = data.player.inventory || [];
             this.game.player.equipment = data.player.equipment || { weapon: null, armor: null };
             
-            // Restaura a Posição
             if (data.player.x !== undefined && data.player.z !== undefined) {
-                // Removemos colisões temporariamente para forçar o teleporte
                 this.game.player.mesh.position.set(data.player.x, this.game.player.mesh.position.y, data.player.z);
             }
 
-            // Restaura as Missões
             if (data.quests) {
                 this.game.questManager.quests = data.quests;
             }
 
-            console.log("Jogo carregado com sucesso!");
             return true;
         }
         
-        console.log("Nenhum save encontrado. Iniciando novo jogo.");
         return false;
     }
 }
