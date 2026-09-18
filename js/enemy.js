@@ -108,3 +108,16 @@ export class Enemy {
         this.game.ui.updateHUD(this.game.player);
     }
 }
+
+
+die() {
+        this.isDead = true;
+        this.playAnimation('death');
+        
+      
+        this.game.questManager.onEnemyKilled(this.name);
+        
+       
+        setTimeout(() => {
+            const xpGained = 30;
+
