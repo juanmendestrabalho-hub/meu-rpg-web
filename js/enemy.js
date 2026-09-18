@@ -13,7 +13,7 @@ export class Enemy {
         this.speed = 3;
         this.attackTimer = 0;
         this.isDead = false;
-        this.isDisposed = false; // Flag para o Garbage Collector do game.js
+        this.isDisposed = false; 
         this.isLoaded = false; 
 
         this.mesh = new THREE.Group();
@@ -35,12 +35,11 @@ export class Enemy {
         this.hpTexture = new THREE.CanvasTexture(this.hpCanvas);
         const spriteMat = new THREE.SpriteMaterial({ map: this.hpTexture, depthTest: false });
         this.hpSprite = new THREE.Sprite(spriteMat);
-        this.hpSprite.position.set(0, 2.5, 0); // Fica 2.5 unidades acima do inimigo
+        this.hpSprite.position.set(0, 2.5, 0); 
         this.hpSprite.scale.set(1.5, 0.375, 1);
         this.mesh.add(this.hpSprite);
-        this.updateHpBar(); // Desenha a barra cheia
+        this.updateHpBar(); 
 
-        // Carregamento do Modelo 3D
         const loader = new GLTFLoader();
         loader.load(modelPath, (gltf) => {
             const model = gltf.scene;
@@ -71,21 +70,17 @@ export class Enemy {
         });
     }
 
-    // Função que pinta a barra de vida no Canvas 2D e envia pro 3D
     updateHpBar() {
         const ctx = this.hpCtx;
         ctx.clearRect(0, 0, 128, 32);
         
-        // Fundo preto transparente
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, 128, 32);
         
-        // Barra de Vida
         const percent = Math.max(0, this.hp / this.maxHp);
         ctx.fillStyle = percent > 0.5 ? '#4CAF50' : (percent > 0.25 ? '#FFEB3B' : '#F44336');
         ctx.fillRect(4, 4, 120 * percent, 24);
         
-        // Texto de HP
         ctx.fillStyle = 'white';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
@@ -116,7 +111,6 @@ export class Enemy {
         if (!this.isLoaded) return;
         if (this.mixer) this.mixer.update(delta);
         
-        // Se estiver morto, ele não persegue mais (mas o mixer acima continua atualizando a animação de morte)
         if (this.isDead || !this.game.player || !this.game.player.isLoaded) return;
 
         if (this.attackTimer > 0) this.attackTimer -= delta;
@@ -153,9 +147,8 @@ export class Enemy {
         
         const actualDamage = Math.max(1, amount - this.def);
         this.hp -= actualDamage;
-        this.updateHpBar(); // Atualiza o Sprite visual do HP
+        this.updateHpBar(); 
 
-        // Feedback de piscada em vermelho
         this.mesh.traverse((child) => {
             if (child.isMesh && child.material && !Array.isArray(child.material)) {
                 if (!child.userData.origColor) child.userData.origColor = child.material.color.clone();
@@ -173,7 +166,7 @@ export class Enemy {
 
     die() {
         this.isDead = true;
-        this.hpSprite.visible = false; // Esconde a barra de vida ao morrer
+        this.hpSprite.visible = false; 
         this.playAnimation('death');
         
         this.game.questManager.onEnemyKilled(this.name);
@@ -191,11 +184,20 @@ export class Enemy {
 
             if (droppedItem) this.game.player.inventory.push(droppedItem);
             this.game.ui.updateHUD(this.game.player);
+
+            // Verifica se a Missão do Caçador está ativa para dropar o Fragmento Sombrio
+            const hq = this.game.questManager.quests.hunterQuest;
+            if (hq && hq.status === 'active') {
+                if (Math.random() > 0.40) { // 60% chance
+                    this.game.spawnItem(this.mesh.position.x, this.mesh.position.z, 0x880088, () => {
+                        return this.game.questManager.collectFragment();
+                    });
+                }
+            }
             
-            // Aguarda a animação terminar antes de apagar a malha (3 segundos)
             setTimeout(() => { 
                 this.game.scene.remove(this.mesh); 
-                this.isDisposed = true; // Avisa a GameEngine que pode remover da lista
+                this.isDisposed = true; 
             }, 3000);
         }, 1000);
     }
